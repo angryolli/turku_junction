@@ -103,6 +103,7 @@ export function AntibiogramView() {
   }, [resetRevision]);
 
   useEffect(() => {
+    let on = true;
     const params = new URLSearchParams();
     if (ward !== "all") params.set("ward", ward);
     if (specimen !== "all") params.set("specimen", specimen);
@@ -111,13 +112,18 @@ export function AntibiogramView() {
     const query = params.toString();
     void browserGet<AntibiogramResponse>(`/antibiogram${query ? `?${query}` : ""}`)
       .then((data) => {
+        if (!on) return;
         setRows(data.rows);
         setError("");
       })
       .catch((err: unknown) => {
+        if (!on) return;
         setRows([]);
         setError(err instanceof Error ? err.message : "Antibiogram unavailable");
       });
+    return () => {
+      on = false;
+    };
   }, [asOf, ward, specimen, organism, sex, resetRevision]);
 
   return (
@@ -198,7 +204,18 @@ export function AntibiogramView() {
         </table>
       </div>
       {chart && (
-        <RateChartModal row={chart.row} origin={chart.origin} onClose={() => setChart(null)} />
+        <RateChartModal
+          row={
+            rows.find(
+              (row) =>
+                row.ward_code === chart.row.ward_code &&
+                row.organism === chart.row.organism &&
+                row.antibiotic_code === chart.row.antibiotic_code,
+            ) ?? chart.row
+          }
+          origin={chart.origin}
+          onClose={() => setChart(null)}
+        />
       )}
     </div>
   );
