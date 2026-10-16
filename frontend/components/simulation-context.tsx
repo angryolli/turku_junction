@@ -37,7 +37,7 @@ const SimulationContext = createContext<SimulationContextValue>({
   resetting: false,
   resetRevision: 0,
   setPlaying: () => undefined,
-  togglePlay: async () => ({ snapshot: {} as MonitorSnapshot, archived_run_id: null }),
+  togglePlay: async () => undefined,
   resetSimulation: async () => ({ snapshot: {} as MonitorSnapshot, archived_run_id: null }),
   ticksPerSecond: DEFAULT_TPS,
   setTicksPerSecond: async () => undefined,
@@ -162,11 +162,6 @@ export function SimulationProvider({ children }: { children: React.ReactNode }) 
     try {
       const body = await browserPost<StreamResetResponse>("/stream/reset", {});
       applySnapshot(body.snapshot);
-      await fetch("/api/system-agent", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ reset: true }),
-      }).catch(() => undefined);
       setResetRevision((value) => value + 1);
       return body;
     } finally {

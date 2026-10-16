@@ -69,22 +69,59 @@ export type FieldCard = {
   source_id?: string;
 };
 
+export type WardCard = {
+  ward_code: string;
+  ward_en: string;
+  ward_type: string;
+  status: Chip;
+  n_hot: number;
+};
+
+export type RateCard = {
+  ward_code: string;
+  ward_en: string;
+  organism: string;
+  antibiotic: string;
+  antibiotic_code: string;
+  n_4w: number;
+  pct_4w: number | null;
+  n_year: number;
+  pct_year: number | null;
+  z: number | null;
+  level: Chip;
+  direction: string;
+  sparkline: number[];
+};
+
 export type MonitorSnapshot = {
-  calibration_id: string | null;
   dataset_id: string;
   tick: number;
-  t2_series: number[];
-  control_limit: number;
-  fields: FieldCard[];
-  demo_fields?: FieldCard[];
-  demo_tick?: number;
-  exclusion_list: string[];
-  latest_event_id: string | null;
-  demo_data_uri?: string;
+  as_of: string | null;
+  date_start: string;
+  date_end: string;
   playing?: boolean;
   ticks_per_second?: number;
   finished?: boolean;
-  evidence: str;
+  wards: WardCard[];
+  open_alerts: RateCard[];
+  fields?: FieldCard[];
+  demo_data_uri?: string;
+  evidence: string;
+};
+
+export type AntibiogramResponse = {
+  as_of: string | null;
+  rows: RateCard[];
+};
+
+export type LabCatalog = {
+  wards: Array<{ code: string; en: string; type: string }>;
+  organisms: string[];
+  specimens: string[];
+  sexes: string[];
+  antibiotics: Array<{ code: string; name: string; urine_only: boolean }>;
+  date_start: string;
+  date_end: string;
 };
 
 export type DataSourcePreview = {
@@ -121,6 +158,9 @@ export type RuntimeConfig = {
   playing?: boolean;
   ticks_per_second?: number;
   finished?: boolean;
+  as_of?: string | null;
+  date_start?: string;
+  date_end?: string;
 };
 
 export type StreamResetResponse = {
@@ -149,10 +189,18 @@ export type SimulationRunDetail = SimulationRunSummary & {
   alarms: Array<{
     id: string;
     tick: number;
-    level: string;
+    level: "yellow" | "red";
     score: number;
     z: number;
-    top_fields: Array<Record<string, unknown>>;
+    top_fields: Array<{
+      field_id: string;
+      score: number;
+      mean: number | null;
+      sd: number | null;
+      skew: number | null;
+      kurt: number | null;
+      n: number;
+    }>;
     evidence: string;
     reason?: string;
     origins?: string[];

@@ -111,9 +111,7 @@ export function DataSourcesView() {
 
     function apply(data: MonitorSnapshot) {
       if (!on) return;
-      const fieldKey = (data.fields ?? [])
-        .map((field) => `${field.source_id ?? ""}:${field.field_id}`)
-        .join("|");
+      const fieldKey = data.as_of ?? "";
       if (
         data.tick === ticksRef.current.tick &&
         data.dataset_id === ticksRef.current.dataset &&

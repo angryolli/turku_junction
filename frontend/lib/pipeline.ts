@@ -93,6 +93,25 @@ export async function getDiagnosis() {
   return pipeline<DiagnosisSnapshot>("/diagnosis");
 }
 
+export type Situation = {
+  as_of: string | null;
+  tick: number;
+  playing: boolean;
+  finished: boolean;
+  window: string;
+  min_isolates: number;
+  wards: Array<{ ward_code: string; ward_en: string; status: string; n_hot: number }>;
+  open_alerts: Array<Record<string, unknown>>;
+  published_rates: Array<Record<string, unknown>>;
+  alert_log: DiagnosisSignal[];
+  evidence: string;
+};
+
+export async function getSituation(ward?: string) {
+  const query = ward ? `?ward=${encodeURIComponent(ward)}` : "";
+  return pipeline<Situation>(`/situation${query}`);
+}
+
 export async function getDecisionLog(params?: { type?: string }) {
   const q = params?.type ? `?type=${params.type}` : "";
   return pipeline(`/decision-log${q}`);

@@ -12,18 +12,12 @@ from starlette.middleware.gzip import GZipMiddleware
 from starlette.types import ASGIApp, Receive, Scope, Send
 
 from app.models.schemas import (
+    AntibiogramResponse,
     ChatCreateRequest,
     ChatDetail,
     ChatSaveRequest,
     ChatSummary,
     ConfigUpdate,
-    DataSource,
-    DataSourceBulkDelete,
-    DataSourceCreate,
-    DataSourceFileCreate,
-    DataSourcePreview,
-    DataSourcePreviewRequest,
-    DataSourceUpdate,
     DecisionAppend,
     DecisionLogPage,
     HealthResponse,
@@ -31,6 +25,7 @@ from app.models.schemas import (
     RuntimeConfig,
     SimulationRunDetail,
     SimulationRunSummary,
+    SituationResponse,
     StreamControl,
     StreamResetResponse,
 )
@@ -144,11 +139,11 @@ class _SkipStreamGZip:
         await self.gzip(scope, receive, send)
 
 
-app = FastAPI(title="Trustworthy process monitor — compute plane", lifespan=lifespan)
+app = FastAPI(title="AMR ward monitor — compute plane", lifespan=lifespan)
 app.add_middleware(_SkipStreamGZip, minimum_size=500)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],
+    allow_origins=["http://localhost:3000", "http://localhost:3001", "http://127.0.0.1:3001"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -157,11 +152,10 @@ app.add_middleware(
 
 @app.get("/health", response_model=HealthResponse)
 def health() -> HealthResponse:
-    tick = STATE.source.tick if STATE.source is not None else 0
     return HealthResponse(
         status="ok",
-        stream_tick=tick,
-        live_rows=tick,
+        stream_tick=STATE.tick,
+        live_rows=STATE.tick,
     )
 
 
@@ -178,76 +172,30 @@ def post_config(body: ConfigUpdate) -> RuntimeConfig:
         raise HTTPException(400, str(exc)) from exc
 
 
-@app.get("/data-sources", response_model=list[DataSource])
-def data_sources_list() -> list[DataSource]:
-    return STATE.list_data_sources()
+@app.get("/catalog")
+def catalog() -> dict:
+    return STATE.catalog()
 
 
-@app.post("/data-sources", response_model=DataSource)
-def data_sources_create(body: DataSourceCreate) -> DataSource:
+@app.get("/antibiogram", response_model=AntibiogramResponse)
+def antibiogram(
+    ward: str | None = None,
+    specimen: str | None = None,
+    organism: str | None = None,
+    sex: str | None = None,
+) -> AntibiogramResponse:
     try:
-        return STATE.add_data_source(body)
+        return STATE.antibiogram(ward=ward, specimen=specimen, organism=organism, sex=sex)
     except ValueError as exc:
         raise HTTPException(400, str(exc)) from exc
 
 
-@app.post("/data-sources/preview", response_model=DataSourcePreview)
-def data_sources_preview(body: DataSourcePreviewRequest) -> DataSourcePreview:
-    if not body.path.strip():
-        raise HTTPException(400, "file path is required")
+@app.get("/situation", response_model=SituationResponse)
+def situation(ward: str | None = None) -> SituationResponse:
     try:
-        return DataSourcePreview(**STATE.preview_source(body.path))
-    except Exception as exc:
-        raise HTTPException(400, str(exc)) from exc
-
-
-@app.post("/data-sources/api", response_model=DataSource)
-def data_sources_api(body: DataSourceCreate) -> DataSource:
-    try:
-        return STATE.add_api_source(body.api_url)
+        return STATE.situation(ward=ward)
     except ValueError as exc:
         raise HTTPException(400, str(exc)) from exc
-
-
-@app.post("/data-sources/file", response_model=DataSource)
-def data_sources_file(body: DataSourceFileCreate) -> DataSource:
-    if not body.path.strip():
-        raise HTTPException(400, "file path is required")
-    if not body.x_column.strip():
-        raise HTTPException(400, "x-axis column is required")
-    if not body.y_columns:
-        raise HTTPException(400, "at least one data column is required")
-    try:
-        return STATE.add_file_source(body.path, body.x_column, body.y_columns)
-    except Exception as exc:
-        raise HTTPException(400, str(exc)) from exc
-
-
-@app.put("/data-sources/{source_id}", response_model=DataSource)
-def data_sources_update(source_id: str, body: DataSourceUpdate) -> DataSource:
-    try:
-        return STATE.patch_data_source(source_id, body)
-    except KeyError as exc:
-        raise HTTPException(404, "unknown data source") from exc
-
-
-@app.delete("/data-sources/{source_id}")
-def data_sources_delete(source_id: str) -> dict:
-    try:
-        STATE.remove_data_source(source_id)
-    except KeyError as exc:
-        raise HTTPException(404, "unknown data source") from exc
-    except ValueError as exc:
-        raise HTTPException(400, str(exc)) from exc
-    return {"ok": True}
-
-
-@app.post("/data-sources/bulk-delete")
-def data_sources_bulk_delete(body: DataSourceBulkDelete) -> MonitorSnapshot:
-    if not body.fields:
-        raise HTTPException(400, "no data sources selected")
-    STATE.remove_fields([item.model_dump() for item in body.fields])
-    return _broadcast_snapshot()
 
 
 @app.post("/stream/control", response_model=MonitorSnapshot)

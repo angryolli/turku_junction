@@ -18,19 +18,15 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import {
-  browserGet,
-  type DataSource,
-  type RuntimeConfig,
-} from "@/lib/browser-api";
+import { type RuntimeConfig } from "@/lib/browser-api";
 import { useSimulation } from "@/components/simulation-context";
 import { SimulationSpeedometer } from "@/components/simulation-speedometer";
 
 const NAV = [
-  { href: "/", label: "System Dashboard", icon: LayoutDashboard },
-  { href: "/telemetry", label: "Telemetry", icon: Activity },
-  { href: "/agent", label: "Agent", icon: MessageSquare },
-  { href: "/reports", label: "Reports & Logs", icon: ScrollText },
+  { href: "/", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/telemetry", label: "Antibiogram", icon: Activity },
+  { href: "/agent", label: "Chat", icon: MessageSquare },
+  { href: "/reports", label: "Alerts", icon: ScrollText },
 ];
 
 export function AppSidebar() {
@@ -39,7 +35,6 @@ export function AppSidebar() {
   const [collapsed, setCollapsed] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [cfg, setCfg] = useState<RuntimeConfig | null>(null);
-  const [sources, setSources] = useState<DataSource[]>([]);
   const { playing, finished, resetting, togglePlay, resetSimulation } =
     useSimulation();
   const [resetOpen, setResetOpen] = useState(false);
@@ -63,12 +58,10 @@ export function AppSidebar() {
         calibration_id: data.calibration_id,
         baseline_established: data.baseline_established,
         no_egress: data.node?.noEgress ?? data.no_egress,
+        as_of: data.as_of,
+        date_start: data.date_start,
+        date_end: data.date_end,
       });
-      try {
-        setSources(await browserGet<DataSource[]>("/data-sources"));
-      } catch {
-        setSources([]);
-      }
     } catch {
       setCfg(null);
     }
@@ -85,15 +78,6 @@ export function AppSidebar() {
       window.localStorage.setItem("tpm-sidebar", next ? "1" : "0");
       return next;
     });
-  }
-
-  async function setDataset(dataset_id: string) {
-    await fetch("/api/config", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ dataset_id }),
-    });
-    await refresh();
   }
 
   async function toggleEgress() {
@@ -143,7 +127,7 @@ export function AppSidebar() {
               folded && "hidden",
             )}
           >
-            TPM
+            AMR
           </p>
           <Button
             size="icon-sm"
@@ -258,9 +242,7 @@ export function AppSidebar() {
               </Button>
             </div>
             <p className="text-sm text-muted-foreground">
-              Archives the current alarm log and decision log to Reports &amp;
-              Logs, clears the System Dashboard and system agent context, and
-              rewinds all sources to tick 0.
+              Archives this replay’s alerts and rewinds the lab day to the start of the dataset.
             </p>
             <div className="mt-4 flex justify-end gap-2">
               <Button variant="ghost" onClick={() => setResetOpen(false)}>
@@ -307,33 +289,15 @@ export function AppSidebar() {
               </Button>
             </div>
             <div className="space-y-4 text-sm">
-              <label className="block space-y-1">
-                <span className="text-xs text-muted-foreground">
-                  Active data source
-                </span>
-                <select
-                  className="h-8 w-full rounded-md border border-input bg-background px-2 font-mono text-xs"
-                  value={cfg?.dataset_id ?? sources[0]?.id ?? ""}
-                  onChange={(e) => void setDataset(e.target.value)}
-                >
-                  {(sources.length
-                    ? sources
-                    : (cfg?.datasets ?? []).map((id) => ({
-                        id,
-                        name: id,
-                      }))
-                  ).map((src) => (
-                    <option key={src.id} value={src.id}>
-                      {src.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <p className="font-mono text-xs text-muted-foreground">
-                Calibration {cfg?.baseline_established ? "frozen" : "none"}
+              <p className="text-xs text-muted-foreground">
+                Synthetic microbiology dataset
+                {cfg?.date_start ? ` · ${cfg.date_start} to ${cfg.date_end}` : ""}
               </p>
               <p className="font-mono text-xs text-muted-foreground">
-                LLM Mistral Large via OpenAI-compatible API
+                {cfg?.as_of ? `Lab day ${cfg.as_of}` : "Replay has not started"}
+              </p>
+              <p className="font-mono text-xs text-muted-foreground">
+                LLM via the configured chat model
               </p>
               <Button
                 size="sm"

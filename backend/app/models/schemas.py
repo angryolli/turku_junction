@@ -40,6 +40,9 @@ class RuntimeConfig(BaseModel):
     playing: bool = False
     ticks_per_second: float = 2.0
     finished: bool = False
+    as_of: str | None = None
+    date_start: str = ""
+    date_end: str = ""
 
 
 class ConfigUpdate(BaseModel):
@@ -336,33 +339,61 @@ class SimulationRunDetail(SimulationRunSummary):
     decisions: list[DecisionEntry] = Field(default_factory=list)
 
 
-class FieldCard(BaseModel):
-    field_id: str
+class WardCard(BaseModel):
+    ward_code: str
+    ward_en: str
+    ward_type: str = ""
+    status: Chip = "normal"
+    n_hot: int = 0
+
+
+class RateCard(BaseModel):
+    ward_code: str
+    ward_en: str
+    organism: str
+    antibiotic: str
+    antibiotic_code: str
+    n_4w: int = 0
+    pct_4w: float | None = None
+    n_year: int = 0
+    pct_year: float | None = None
+    z: float | None = None
+    level: Chip = "normal"
+    direction: str = ""
     sparkline: list[float] = Field(default_factory=list, max_length=SPARKLINE_POINTS)
-    status: Chip
-    contribution: float = 0.0
-    evidence: str = ""
-    source_file: str = ""
-    source_id: str = ""
 
 
 class MonitorSnapshot(BaseModel):
-    calibration_id: str | None = None
-    dataset_id: str
-    tick: int
-    t2_series: list[float] = Field(default_factory=list, max_length=60)
-    control_limit: float = 0.0
-    live_boundary: int = 0
-    fields: list[FieldCard] = Field(default_factory=list, max_length=80)
-    demo_fields: list[FieldCard] = Field(default_factory=list, max_length=80)
-    demo_tick: int = 0
-    exclusion_list: list[str] = Field(default_factory=list, max_length=20)
-    latest_event_id: str | None = None
-    demo_data_uri: str = ""
+    dataset_id: str = "lab"
+    tick: int = 0
+    as_of: str | None = None
+    date_start: str = ""
+    date_end: str = ""
     playing: bool = False
     ticks_per_second: float = 2.0
     finished: bool = False
-    evidence: str = "Monitor snapshot is aggregated windows, not raw row dumps."
+    wards: list[WardCard] = Field(default_factory=list, max_length=20)
+    open_alerts: list[RateCard] = Field(default_factory=list, max_length=80)
+    evidence: str = "Four-week and annual resistance rates. No raw culture rows."
+
+
+class AntibiogramResponse(BaseModel):
+    as_of: str | None = None
+    rows: list[RateCard] = Field(default_factory=list, max_length=2000)
+
+
+class SituationResponse(BaseModel):
+    as_of: str | None = None
+    tick: int = 0
+    playing: bool = False
+    finished: bool = False
+    window: str = ""
+    min_isolates: int = 30
+    wards: list[WardCard] = Field(default_factory=list, max_length=20)
+    open_alerts: list[RateCard] = Field(default_factory=list, max_length=80)
+    published_rates: list[RateCard] = Field(default_factory=list, max_length=400)
+    alert_log: list[DiagnosisSignal] = Field(default_factory=list, max_length=40)
+    evidence: str = ""
 
 
 class StreamResetResponse(BaseModel):

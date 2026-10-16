@@ -25,8 +25,7 @@ function partText(part: UIMessage["parts"][number]) {
 }
 
 function toolTitle(name: string) {
-  if (name === "getDiagnosis") return "diagnosis table";
-  if (name === "getDecisionLog") return "decision log";
+  if (name === "getSituation") return "lab situation";
   return name;
 }
 
@@ -211,7 +210,7 @@ function ChatPane({
   const context = params.get("context");
   const [input, setInput] = useState(
     context
-      ? `Explain diagnosis ${context} using the diagnosis table. Never use raw rows.`
+      ? `Explain alert ${context} using the current lab situation. Do not use raw culture rows.`
       : "",
   );
   const listRef = useRef<HTMLDivElement>(null);
@@ -275,7 +274,7 @@ function ChatPane({
         <div className="mx-auto flex max-w-3xl flex-col gap-3">
           {messages.length === 0 && (
             <p className="pt-8 text-center text-sm text-muted-foreground">
-              Ask why a flag fired. Answers come from artifacts only.
+              Ask about a ward’s resistance rate. Answers use the live rates and alerts only.
             </p>
           )}
           {messages.map((message, index) => {
@@ -363,7 +362,7 @@ function ChatPane({
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={onKeyDown}
-            placeholder="Ask why a flag fired"
+            placeholder="Ask about a ward or an alert"
             rows={1}
             disabled={streaming}
             className="max-h-24 min-h-10 flex-1 resize-none overflow-y-auto rounded-lg border border-input bg-transparent px-3 py-2 text-sm outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:opacity-50"
