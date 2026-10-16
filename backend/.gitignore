@@ -1,0 +1,20 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+# Virtual environments
+.venv
+
+.env
+
+te_process.csv
+artifacts/*.sqlite
+artifacts/*.sqlite-*
+artifacts/*.json
+artifacts/*.jsonl
+artifacts/*/
+data/*.csv
