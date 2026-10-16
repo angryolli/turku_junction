@@ -1,5 +1,5 @@
 [project]
-name = "synthetic-microbiology-dataset"
+name = "turku-data-processing"
 version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
@@ -12,9 +12,5 @@ dependencies = [
     "pandas>=3.0.6",
 ]
 
-[project.scripts]
-synthetic-microbiology-dataset = "synthetic_microbiology_dataset:main"
-
-[build-system]
-requires = ["uv_build>=0.12.1,<0.13.0"]
-build-backend = "uv_build"
+[tool.uv]
+package = false
