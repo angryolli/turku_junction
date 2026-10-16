@@ -146,13 +146,7 @@ export function AppSidebar() {
             className={cn("w-full", !folded && "justify-start gap-2")}
             onClick={() => void togglePlay().catch(() => undefined)}
             aria-label={playing ? "Pause" : "Play"}
-            title={
-              playing
-                ? "Pause"
-                : finished
-                  ? "Stream ended. Reset below to play again."
-                  : "Play"
-            }
+            title={playing ? "Pause" : finished ? "Play again from the first day" : "Play"}
           >
             {playing ? <Pause /> : <Play />}
             <span className={cn(folded && "hidden")}>

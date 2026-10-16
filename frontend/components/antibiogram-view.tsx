@@ -10,28 +10,45 @@ import {
   type MonitorSnapshot,
   type RateCard,
 } from "@/lib/browser-api";
+import { RateChartModal } from "@/components/rate-chart-modal";
 import { useSimulation } from "@/components/simulation-context";
 
 function pct(value: number | null) {
   return value == null ? "—" : `${value.toFixed(1)}%`;
 }
 
-function Spark({ values }: { values: number[] }) {
-  if (values.length < 2) return <span className="text-muted-foreground">—</span>;
+function Spark({
+  values,
+  onClick,
+}: {
+  values: number[];
+  onClick: (origin: { left: number; top: number; width: number; height: number }) => void;
+}) {
+  if (values.length < 1) return <span className="text-muted-foreground">—</span>;
   const min = Math.min(...values);
   const max = Math.max(...values);
   const span = Math.max(max - min, 1);
   const d = values
     .map((value, index) => {
-      const x = (index / (values.length - 1)) * 72;
+      const x = values.length === 1 ? 36 : (index / (values.length - 1)) * 72;
       const y = 18 - ((value - min) / span) * 16;
       return `${index === 0 ? "M" : "L"}${x.toFixed(1)} ${y.toFixed(1)}`;
     })
     .join(" ");
   return (
-    <svg viewBox="0 0 72 20" className="h-5 w-20 text-foreground" aria-hidden>
-      <path d={d} fill="none" stroke="currentColor" strokeWidth="1.5" />
-    </svg>
+    <button
+      type="button"
+      className="block rounded-sm hover:bg-muted"
+      aria-label="Open rolling rate"
+      onClick={(event) => {
+        const rect = event.currentTarget.getBoundingClientRect();
+        onClick({ left: rect.left, top: rect.top, width: rect.width, height: rect.height });
+      }}
+    >
+      <svg viewBox="0 0 72 20" className="h-5 w-20 text-foreground">
+        <path d={d} fill="none" stroke="currentColor" strokeWidth="1.5" />
+      </svg>
+    </button>
   );
 }
 
@@ -45,6 +62,10 @@ export function AntibiogramView() {
   const [asOf, setAsOf] = useState<string | null>(null);
   const [rows, setRows] = useState<RateCard[]>([]);
   const [error, setError] = useState("");
+  const [chart, setChart] = useState<{
+    row: RateCard;
+    origin: { left: number; top: number; width: number; height: number };
+  } | null>(null);
 
   useEffect(() => {
     void browserGet<LabCatalog>("/catalog")
@@ -104,8 +125,8 @@ export function AntibiogramView() {
       <header>
         <h1 className="text-lg font-medium">Antibiogram</h1>
         <p className="text-sm text-muted-foreground">
-          {asOf ? `Through ${asOf}` : "Press play to move the lab day forward."} Percent resistant is blank below 30
-          isolates. The line is the four-week rate on recent days.
+          {asOf ? `Through ${asOf}` : "Press play to move the lab day forward."} The percentage stays blank below 30
+          isolates. The line still draws the four-week rate on those days. Click a line to expand it.
         </p>
       </header>
       <div className="flex flex-wrap gap-2">
@@ -166,13 +187,19 @@ export function AntibiogramView() {
                   <StatusChip status={row.level} />
                 </td>
                 <td className="px-3 py-2">
-                  <Spark values={row.sparkline} />
+                  <Spark
+                    values={row.sparkline}
+                    onClick={(origin) => setChart({ row, origin })}
+                  />
                 </td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
+      {chart && (
+        <RateChartModal row={chart.row} origin={chart.origin} onClose={() => setChart(null)} />
+      )}
     </div>
   );
 }

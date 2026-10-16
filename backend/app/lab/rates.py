@@ -23,10 +23,17 @@ class RateCount:
     resistant: int
 
     @property
+    def observed(self) -> float | None:
+        """Four-week percent resistant, including windows under 30 isolates."""
+        if self.n <= 0:
+            return None
+        return round(100.0 * self.resistant / self.n, 1)
+
+    @property
     def percent(self) -> float | None:
         if self.n < MIN_ISOLATES:
             return None
-        return round(100.0 * self.resistant / self.n, 1)
+        return self.observed
 
 
 def window_bounds(as_of_ordinal: int) -> tuple[tuple[int, int], tuple[int, int]]:

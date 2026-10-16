@@ -144,6 +144,19 @@ function paint(
     ctx.stroke();
   }
 
+  if (limit !== undefined && Number.isFinite(limit)) {
+    const y = Math.round(yOf(limit)) + 0.5;
+    ctx.save();
+    ctx.strokeStyle = "rgba(161,161,170,0.85)";
+    ctx.setLineDash([4, 4]);
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(padL, y);
+    ctx.lineTo(w - padR, y);
+    ctx.stroke();
+    ctx.restore();
+  }
+
   ctx.strokeStyle = accent;
   ctx.lineWidth = 1.25;
   ctx.lineJoin = "round";

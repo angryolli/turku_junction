@@ -133,7 +133,22 @@ export function SimulationProvider({ children }: { children: React.ReactNode }) 
     [],
   );
 
+  const resetSimulation = useCallback(async () => {
+    setResetting(true);
+    try {
+      const body = await browserPost<StreamResetResponse>("/stream/reset", {});
+      applySnapshot(body.snapshot);
+      setResetRevision((value) => value + 1);
+      return body;
+    } finally {
+      setResetting(false);
+    }
+  }, [applySnapshot]);
+
   const togglePlay = useCallback(async () => {
+    if (!playing && finished) {
+      await resetSimulation();
+    }
     const snap = await browserPost<MonitorSnapshot>("/stream/control", {
       playing: !playing,
     });
@@ -142,7 +157,7 @@ export function SimulationProvider({ children }: { children: React.ReactNode }) 
     if (snap.ticks_per_second != null) {
       setTicksPerSecondState(clampRate(snap.ticks_per_second));
     }
-  }, [playing]);
+  }, [finished, playing, resetSimulation]);
 
   const setTicksPerSecond = useCallback(async (rate: number) => {
     const next = clampRate(rate);
@@ -156,18 +171,6 @@ export function SimulationProvider({ children }: { children: React.ReactNode }) 
     if (snap.playing != null) setPlaying(Boolean(snap.playing));
     if (snap.finished != null) setFinished(Boolean(snap.finished));
   }, []);
-
-  const resetSimulation = useCallback(async () => {
-    setResetting(true);
-    try {
-      const body = await browserPost<StreamResetResponse>("/stream/reset", {});
-      applySnapshot(body.snapshot);
-      setResetRevision((value) => value + 1);
-      return body;
-    } finally {
-      setResetting(false);
-    }
-  }, [applySnapshot]);
 
   const value = useMemo<SimulationContextValue>(
     () => ({

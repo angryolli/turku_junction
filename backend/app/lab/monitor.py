@@ -190,12 +190,12 @@ class LabMonitor:
             z = proportion_z(recent_cell, base_cell)
             level = level_for(z)
             sparkline: list[float] = []
-            if record and recent_cell.percent is not None:
+            if record and recent_cell.observed is not None:
                 series = self.sparklines.get(key)
                 if series is None:
                     series = deque(maxlen=SPARKLINE)
                     self.sparklines[key] = series
-                series.append(recent_cell.percent)
+                series.append(recent_cell.observed)
             if record or attach_sparkline:
                 series = self.sparklines.get(key)
                 sparkline = list(series) if series is not None else []

@@ -200,7 +200,7 @@ class AppState:
         )
 
     def diagnosis_snapshot(self) -> dict:
-        signals = self.store.list_diagnosis(40)
+        signals = self.store.list_diagnosis(200)
         as_of = self.lab.as_of
         return {
             "signals": signals,
