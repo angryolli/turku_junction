@@ -1,4 +1,4 @@
-# Trustworthy process monitor
+# Trustworthy process monitorr
 
 FastAPI is the compute plane (raw data stays there). Next.js is the reasoning plane (LLM sees artifacts only).
 
