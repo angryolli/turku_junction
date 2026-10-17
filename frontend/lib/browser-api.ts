@@ -99,6 +99,7 @@ export type MonitorSnapshot = {
   as_of: string | null;
   date_start: string;
   date_end: string;
+  revision?: number;
   playing?: boolean;
   ticks_per_second?: number;
   finished?: boolean;

@@ -12,6 +12,9 @@ from starlette.middleware.gzip import GZipMiddleware
 from starlette.types import ASGIApp, Receive, Scope, Send
 
 from app.models.schemas import (
+    AnalysisRequest,
+    AnalysisResponse,
+    ChartWorkspace,
     AntibiogramResponse,
     ChatCreateRequest,
     ChatDetail,
@@ -85,16 +88,20 @@ def _push(queue: asyncio.Queue, item: Any) -> None:
 async def _stream() -> None:
     global _events_key
     while not _stopping:
-        STATE.tick_live()
-        snap = STATE.monitor()
-        for queue in list(_snapshot_subs):
-            _push(queue, snap)
-        key = STATE.events_key()
-        if key != _events_key:
-            _events_key = key
-            payload = STATE.events_snapshot()
-            for queue in list(_event_subs):
-                _push(queue, payload)
+        try:
+            await asyncio.to_thread(STATE.tick_live)
+            snap = await asyncio.to_thread(STATE.monitor)
+            for queue in list(_snapshot_subs):
+                _push(queue, snap)
+            key = await asyncio.to_thread(STATE.events_key)
+            if key != _events_key:
+                _events_key = key
+                payload = await asyncio.to_thread(STATE.events_snapshot)
+                for queue in list(_event_subs):
+                    _push(queue, payload)
+        except Exception:
+            import logging
+            logging.getLogger("uvicorn.error").exception("replay tick failed")
         await asyncio.sleep(STATE.tick_seconds)
 
 
@@ -186,6 +193,39 @@ def antibiogram(
 ) -> AntibiogramResponse:
     try:
         return STATE.antibiogram(ward=ward, specimen=specimen, organism=organism, sex=sex)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+
+
+@app.get("/charts", response_model=ChartWorkspace)
+def charts() -> ChartWorkspace:
+    return STATE.chart_workspace()
+
+
+@app.put("/charts", response_model=ChartWorkspace)
+def save_charts(body: ChartWorkspace) -> ChartWorkspace:
+    try:
+        return STATE.save_chart_workspace(body)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+
+
+@app.get("/compare", response_model=AnalysisResponse)
+def compare(
+    organism: str,
+    code: str,
+    ward: list[str] = Query(default=[]),
+) -> AnalysisResponse:
+    try:
+        return STATE.compare(organism, code, ward)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+
+
+@app.post("/analysis", response_model=AnalysisResponse)
+def analysis(body: AnalysisRequest) -> AnalysisResponse:
+    try:
+        return STATE.analysis(body.sql)
     except ValueError as exc:
         raise HTTPException(400, str(exc)) from exc
 

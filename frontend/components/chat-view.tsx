@@ -153,7 +153,7 @@ export function ChatView() {
         }}
       />
       <aside className="flex h-full w-64 shrink-0 flex-col border-l border-border bg-background">
-        <div className="flex items-center justify-between gap-2 border-b border-border px-3 py-3">
+        <div className="flex h-12 items-center justify-between gap-2 border-b border-border px-3">
           <p className="text-xs tracking-wide text-muted-foreground uppercase">History</p>
           <Button size="icon-sm" variant="ghost" onClick={newChat} aria-label="New chat">
             <Plus />

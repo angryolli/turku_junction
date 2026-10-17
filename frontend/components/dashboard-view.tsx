@@ -21,7 +21,7 @@ export function DashboardView() {
   const [snap, setSnap] = useState<MonitorSnapshot | null>(null);
   const [openCode, setOpenCode] = useState<string | null>(null);
   const [detail, setDetail] = useState<RateCard[]>([]);
-  const { playing, finished, resetRevision } = useSimulation();
+  const { resetRevision } = useSimulation();
   const key = useRef("");
 
   useEffect(() => {
@@ -92,22 +92,11 @@ export function DashboardView() {
     };
   }, [openCode, snap?.as_of]);
 
-  const asOf = snap?.as_of;
   const openWard = (snap?.wards ?? []).find((ward) => ward.ward_code === openCode) ?? null;
 
   return (
-    <div className="mx-auto flex h-full min-h-0 w-full max-w-5xl flex-col gap-4 overflow-y-auto p-4">
-      <header>
-        <h1 className="text-lg font-medium">Wards</h1>
-        <p className="text-sm text-muted-foreground">
-          {asOf
-            ? `Lab day ${asOf}`
-            : `Press play. Cultures run ${snap?.date_start ?? "2023-10-02"} to ${snap?.date_end ?? "2026-09-27"}.`}
-          {playing ? " · playing" : finished ? " · replay finished" : ""}
-        </p>
-      </header>
-
-      <section className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
+    <div className="h-full min-h-0 overflow-y-auto p-4">
+      <section className="mx-auto grid w-full max-w-5xl grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
         {(snap?.wards ?? []).map((ward) => (
           <WardTile
             key={ward.ward_code}

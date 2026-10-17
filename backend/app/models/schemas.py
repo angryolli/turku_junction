@@ -369,6 +369,7 @@ class MonitorSnapshot(BaseModel):
     as_of: str | None = None
     date_start: str = ""
     date_end: str = ""
+    revision: int = 0
     playing: bool = False
     ticks_per_second: float = 2.0
     finished: bool = False
@@ -380,6 +381,40 @@ class MonitorSnapshot(BaseModel):
 class AntibiogramResponse(BaseModel):
     as_of: str | None = None
     rows: list[RateCard] = Field(default_factory=list, max_length=2000)
+
+
+class ChartView(BaseModel):
+    id: str = "g1"
+    organism: str = ""
+    code: str = ""
+    wards: list[str] = Field(default_factory=list, max_length=20)
+    focus: str | None = None
+    view_start: float = 0
+    view_span: float = 1
+
+
+class ChartWorkspace(SizedArtifact):
+    active_id: str = "g1"
+    tabs: list[ChartView] = Field(default_factory=list, max_length=24)
+
+
+class AnalysisRequest(BaseModel):
+    sql: str = ""
+
+
+class AnalysisSeries(BaseModel):
+    name: str
+    values: list[float] = Field(default_factory=list, max_length=SPARKLINE_POINTS)
+    limit: float | None = None
+
+
+class AnalysisResponse(BaseModel):
+    as_of: str | None = None
+    columns: list[str] = Field(default_factory=list, max_length=32)
+    rows: list[dict[str, Any]] = Field(default_factory=list, max_length=200)
+    series: list[AnalysisSeries] = Field(default_factory=list, max_length=12)
+    matched: int = 0
+    sheet_count: int = 0
 
 
 class SituationResponse(BaseModel):

@@ -4,9 +4,9 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import {
-  Activity,
   ChevronsLeft,
   LayoutDashboard,
+  LineChart,
   MessageSquare,
   PanelLeft,
   Pause,
@@ -19,12 +19,15 @@ import {
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { type RuntimeConfig } from "@/lib/browser-api";
-import { useSimulation } from "@/components/simulation-context";
-import { SimulationSpeedometer } from "@/components/simulation-speedometer";
+import {
+  MAX_TICKS_PER_SECOND,
+  MIN_TICKS_PER_SECOND,
+  useSimulation,
+} from "@/components/simulation-context";
 
 const NAV = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/telemetry", label: "Antibiogram", icon: Activity },
+  { href: "/telemetry", label: "Data analysis", icon: LineChart },
   { href: "/agent", label: "Chat", icon: MessageSquare },
   { href: "/reports", label: "Alerts", icon: ScrollText },
 ];
@@ -35,7 +38,7 @@ export function AppSidebar() {
   const [collapsed, setCollapsed] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [cfg, setCfg] = useState<RuntimeConfig | null>(null);
-  const { playing, finished, resetting, togglePlay, resetSimulation } =
+  const { playing, asOf, finished, resetting, togglePlay, resetSimulation, ticksPerSecond, setTicksPerSecond } =
     useSimulation();
   const [resetOpen, setResetOpen] = useState(false);
 
@@ -122,12 +125,9 @@ export function AppSidebar() {
           )}
         >
           <p
-            className={cn(
-              "flex-1 font-mono text-xs tracking-widest text-muted-foreground uppercase",
-              folded && "hidden",
-            )}
+            className={cn("flex-1 truncate text-sm font-medium", folded && "hidden")}
           >
-            AMR
+            Ward monitor
           </p>
           <Button
             size="icon-sm"
@@ -140,6 +140,39 @@ export function AppSidebar() {
         </div>
 
         <div className={cn("space-y-2 px-2 pb-2", folded && "px-1")}>
+          <label className="block px-0.5">
+            <span className="mb-1 flex items-baseline justify-between font-mono text-[10px] text-muted-foreground">
+              <span className="text-foreground">
+                {ticksPerSecond >= 10 ? ticksPerSecond.toFixed(0) : ticksPerSecond.toFixed(1)}
+              </span>
+              <span className={cn(folded && "hidden")}>ticks/s</span>
+            </span>
+            <input
+              type="range"
+              min={MIN_TICKS_PER_SECOND}
+              max={MAX_TICKS_PER_SECOND}
+              step={0.5}
+              value={ticksPerSecond}
+              onChange={(event) => {
+                void setTicksPerSecond(Number(event.target.value)).catch(() => undefined);
+              }}
+              className="h-1 w-full cursor-pointer appearance-none rounded-full bg-muted accent-foreground"
+              aria-label="Simulation rate in ticks per second"
+              aria-valuemin={MIN_TICKS_PER_SECOND}
+              aria-valuemax={MAX_TICKS_PER_SECOND}
+              aria-valuenow={ticksPerSecond}
+              aria-valuetext={`${ticksPerSecond} ticks per second`}
+            />
+          </label>
+          <p
+            className={cn(
+              "px-0.5 font-mono text-[10px] text-muted-foreground",
+              folded && "truncate text-center",
+            )}
+            title={asOf ?? "No lab day yet"}
+          >
+            {asOf ?? "—"}
+          </p>
           <Button
             size={folded ? "icon-sm" : "sm"}
             variant={playing ? "secondary" : "default"}
@@ -165,10 +198,9 @@ export function AppSidebar() {
             <RotateCcw className={cn(resetting && "animate-spin")} />
             <span className={cn(folded && "hidden")}>Reset</span>
           </Button>
-          <SimulationSpeedometer compact={folded} />
         </div>
 
-        <nav className="flex flex-1 flex-col gap-1 px-2">
+        <nav className="flex flex-1 flex-col gap-0.5 px-2">
           {NAV.map((item) => {
             const active =
               item.href === "/"

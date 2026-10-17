@@ -1,14 +1,19 @@
 from __future__ import annotations
 
 import threading
+import time
 from datetime import datetime, timezone
 
 from app.config import DEFAULT_TICKS_PER_SECOND, MAX_TICKS_PER_SECOND, MIN_TICKS_PER_SECOND
 from app.lab.monitor import LabMonitor, RateRow
 from app.lab.rates import MIN_ISOLATES
 from app.lab.table import load_lab
+from app.lab.query import QueryError, run_query
 from app.models.schemas import (
+    AnalysisResponse,
     AntibiogramResponse,
+    ChartView,
+    ChartWorkspace,
     ConfigUpdate,
     DecisionAppend,
     MonitorSnapshot,
@@ -55,6 +60,7 @@ class AppState:
         self.run_started_at = ""
         self._lock = threading.Lock()
         self._snap: MonitorSnapshot | None = None
+        self._rev = time.time_ns()
 
     @property
     def tick(self) -> int:
@@ -74,20 +80,25 @@ class AppState:
         self.playing = False
         self._snap = None
 
+    def _bump(self) -> None:
+        self._rev = max(self._rev + 1, time.time_ns())
+        self._snap = None
+
     def set_ticks_per_second(self, rate: float) -> float:
         value = float(rate)
         if value != value:
             raise ValueError("ticks_per_second must be a number")
-        self.ticks_per_second = max(MIN_TICKS_PER_SECOND, min(MAX_TICKS_PER_SECOND, value))
-        self._snap = None
-        return self.ticks_per_second
+        with self._lock:
+            self.ticks_per_second = max(MIN_TICKS_PER_SECOND, min(MAX_TICKS_PER_SECOND, value))
+            self._bump()
+            return self.ticks_per_second
 
     def set_playing(self, playing: bool) -> None:
         with self._lock:
             if playing and self.lab.finished:
                 return
             self.playing = bool(playing)
-            self._snap = None
+            self._bump()
 
     def tick_live(self) -> None:
         alerts = []
@@ -97,7 +108,7 @@ class AppState:
             alerts = self.lab.step()
             if self.lab.finished:
                 self.playing = False
-            self._snap = None
+            self._bump()
         for alert in alerts:
             self.store.append_diagnosis(
                 {
@@ -172,6 +183,64 @@ class AppState:
             rows=[_rate_card(row, sparkline=True) for row in rows],
         )
 
+    def compare(self, organism: str, code: str, wards: list[str] | None = None) -> AnalysisResponse:
+        wanted = {item for item in (wards or []) if item}
+        with self._lock:
+            as_of = self.lab.as_of
+            rows = [
+                row
+                for row in self.lab.profile(organism=organism)
+                if row.antibiotic_code == code and (not wanted or row.ward_code in wanted)
+            ]
+        rows.sort(key=lambda row: row.ward_code)
+        return AnalysisResponse(
+            as_of=None if as_of is None else as_of.isoformat(),
+            columns=["ward", "ward_name", "organism", "antibiotic", "code", "n_4w", "pct_4w", "n_year", "pct_year", "z", "level"],
+            rows=[
+                {
+                    "ward": row.ward_code,
+                    "ward_name": row.ward_en,
+                    "organism": row.organism,
+                    "antibiotic": row.antibiotic,
+                    "code": row.antibiotic_code,
+                    "n_4w": row.n_4w,
+                    "pct_4w": row.pct_4w,
+                    "n_year": row.n_year,
+                    "pct_year": row.pct_year,
+                    "z": row.z,
+                    "level": row.level,
+                }
+                for row in rows
+            ],
+            series=[
+                {
+                    "name": row.ward_code,
+                    "values": list(row.sparkline),
+                    "limit": row.pct_year,
+                }
+                for row in rows[:12]
+            ],
+            matched=len(rows),
+            sheet_count=len(rows),
+        )
+
+    def analysis(self, sql: str) -> AnalysisResponse:
+        with self._lock:
+            as_of = self.lab.as_of
+            rows = list(self.lab.profile())
+        try:
+            result = run_query(rows, sql)
+        except QueryError as exc:
+            raise ValueError(str(exc)) from exc
+        return AnalysisResponse(
+            as_of=None if as_of is None else as_of.isoformat(),
+            columns=result["columns"],
+            rows=result["rows"],
+            series=result["series"],
+            matched=result["matched"],
+            sheet_count=result["sheet_count"],
+        )
+
     def situation(self, ward: str | None = None) -> SituationResponse:
         with self._lock:
             as_of = self.lab.as_of
@@ -237,7 +306,7 @@ class AppState:
         with self._lock:
             self.lab.reset()
             self.run_started_at = datetime.now(timezone.utc).isoformat()
-            self._snap = None
+            self._bump()
         self.store.set_run_started_at(self.run_started_at)
         return self.monitor(), archived
 
@@ -290,6 +359,21 @@ class AppState:
             for code, name, kind in zip(table.ward_codes, table.ward_names, table.ward_types, strict=True)
         ]
 
+    def chart_workspace(self) -> ChartWorkspace:
+        raw = self.store.get("chart_workspace", "default")
+        if not raw:
+            return ChartWorkspace(tabs=[ChartView()])
+        try:
+            model = ChartWorkspace.model_validate(raw)
+        except ValueError:
+            return ChartWorkspace(tabs=[ChartView()])
+        return _clean_workspace(model)
+
+    def save_chart_workspace(self, body: ChartWorkspace) -> ChartWorkspace:
+        cleaned = _clean_workspace(body)
+        self.store.put("chart_workspace", "default", cleaned)
+        return cleaned
+
     def _build_snapshot(self) -> MonitorSnapshot:
         as_of = self.lab.as_of
         table = self.lab.table
@@ -299,6 +383,7 @@ class AppState:
             as_of=None if as_of is None else as_of.isoformat(),
             date_start=table.days[0].isoformat(),
             date_end=table.days[-1].isoformat(),
+            revision=self._rev,
             playing=self.playing,
             ticks_per_second=self.ticks_per_second,
             finished=self.lab.finished,
@@ -306,6 +391,25 @@ class AppState:
             open_alerts=[_rate_card(row, sparkline=True) for row in self.lab.hot[:80]],
             evidence=WINDOW_TEXT,
         )
+
+
+def _clean_workspace(body: ChartWorkspace) -> ChartWorkspace:
+    tabs = body.tabs or [ChartView()]
+    cleaned: list[ChartView] = []
+    for tab in tabs[:24]:
+        span = min(1.0, max(0.02, float(tab.view_span)))
+        start = min(max(0.0, float(tab.view_start)), 1.0 - span)
+        cleaned.append(
+            tab.model_copy(
+                update={
+                    "wards": tab.wards[:20],
+                    "view_span": span,
+                    "view_start": start,
+                }
+            )
+        )
+    active = body.active_id if any(tab.id == body.active_id for tab in cleaned) else cleaned[0].id
+    return ChartWorkspace(active_id=active, tabs=cleaned)
 
 
 STATE = AppState()

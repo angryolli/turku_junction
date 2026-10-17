@@ -133,12 +133,12 @@ export function ReportsView() {
   }, [logSort, query, signals]);
 
   return (
-    <div className="mx-auto flex h-full min-h-0 w-full max-w-6xl flex-col gap-4 overflow-hidden p-4">
-      <header className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 className="text-lg font-medium">Alerts</h1>
-          <p className="text-sm text-muted-foreground">
-            Open rows are rates that are off their annual baseline right now. The log is each time a rate crossed further away.
+    <div className="flex h-full min-h-0 flex-col">
+      <header className="flex min-h-12 shrink-0 items-center justify-between gap-3 border-b border-border px-4 py-2">
+        <div className="min-w-0">
+          <h1 className="text-sm font-medium">Alerts</h1>
+          <p className="truncate text-[11px] text-muted-foreground">
+            Open rates, then each time a rate moved further from its annual baseline.
           </p>
         </div>
         <input
@@ -148,7 +148,7 @@ export function ReportsView() {
           className="h-8 w-64 rounded-md border border-input bg-background px-2 font-mono text-xs"
         />
       </header>
-
+      <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden p-3">
       <DataTable
         title={`Open now · ${openRows.length}`}
         columns={[
@@ -228,10 +228,11 @@ export function ReportsView() {
       </DataTable>
 
       {runs.length > 0 && (
-        <p className="font-mono text-xs text-muted-foreground">
+        <p className="shrink-0 font-mono text-[11px] text-muted-foreground">
           Archived replays: {runs.map((run) => `${run.id} (${run.alarm_count})`).join(" · ")}
         </p>
       )}
+      </div>
     </div>
   );
 }

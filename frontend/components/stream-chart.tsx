@@ -161,12 +161,17 @@ function paint(
   ctx.lineWidth = 1.25;
   ctx.lineJoin = "round";
   ctx.lineCap = "round";
-  ctx.beginPath();
-  if (series.length) {
-    ctx.moveTo(xOf(0), yOf(series[0]));
-    for (let i = 1; i < series.length; i++) ctx.lineTo(xOf(i), yOf(series[i]));
-    ctx.stroke();
-  }
+    ctx.beginPath();
+    if (series.length) {
+      ctx.moveTo(xOf(0), yOf(series[0]));
+      for (let i = 1; i < series.length; i++) ctx.lineTo(xOf(i), yOf(series[i]));
+      ctx.stroke();
+      const head = series[series.length - 1];
+      ctx.fillStyle = accent;
+      ctx.beginPath();
+      ctx.arc(xOf(series.length - 1), yOf(head), 2.5, 0, Math.PI * 2);
+      ctx.fill();
+    }
 
   ctx.font = "10px ui-monospace, SFMono-Regular, Menlo, monospace";
   ctx.fillStyle = "rgba(161,161,170,0.9)";
@@ -195,10 +200,11 @@ export const StreamChart = memo(
     accentRef.current = accent;
     marksRef.current = marks;
 
-    const draw = () => {
+    const draw = (force = false) => {
       const wrap = wrapRef.current;
       const canvas = canvasRef.current;
-      if (!wrap || !canvas || !visibleRef.current) return;
+      if (!wrap || !canvas) return;
+      if (!force && !visibleRef.current) return;
       paint(
         canvas,
         wrap,
@@ -229,7 +235,8 @@ export const StreamChart = memo(
     }, []);
 
     useLayoutEffect(() => {
-      draw();
+      visibleRef.current = true;
+      draw(true);
     }, [values, limit, accent, marks]);
 
     return (

@@ -15,7 +15,7 @@ from app.lab.rates import (
 )
 from app.lab.table import LabTable
 
-SPARKLINE = 40
+SPARKLINE = 100
 CellKey = tuple[int, int, int]
 
 
@@ -190,12 +190,15 @@ class LabMonitor:
             z = proportion_z(recent_cell, base_cell)
             level = level_for(z)
             sparkline: list[float] = []
-            if record and recent_cell.observed is not None:
+            if record:
                 series = self.sparklines.get(key)
-                if series is None:
-                    series = deque(maxlen=SPARKLINE)
-                    self.sparklines[key] = series
-                series.append(recent_cell.observed)
+                if recent_cell.observed is not None:
+                    if series is None:
+                        series = deque(maxlen=SPARKLINE)
+                        self.sparklines[key] = series
+                    series.append(recent_cell.observed)
+                elif series:
+                    series.append(series[-1])
             if record or attach_sparkline:
                 series = self.sparklines.get(key)
                 sparkline = list(series) if series is not None else []

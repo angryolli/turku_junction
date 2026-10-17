@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import {
   browserGet,
   browserPost,
@@ -16,6 +16,7 @@ export const MAX_TICKS_PER_SECOND = 50;
 
 type SimulationContextValue = {
   playing: boolean;
+  asOf: string | null;
   finished: boolean;
   resetting: boolean;
   resetRevision: number;
@@ -33,6 +34,7 @@ type SimulationContextValue = {
 
 const SimulationContext = createContext<SimulationContextValue>({
   playing: false,
+  asOf: null,
   finished: false,
   resetting: false,
   resetRevision: 0,
@@ -51,7 +53,10 @@ function clampRate(rate: number) {
 
 export function SimulationProvider({ children }: { children: React.ReactNode }) {
   const [playing, setPlaying] = useState(false);
+  const [asOf, setAsOf] = useState<string | null>(null);
   const [finished, setFinished] = useState(false);
+  const seenRevision = useRef(0);
+  const playBusy = useRef(false);
   const [resetting, setResetting] = useState(false);
   const [resetRevision, setResetRevision] = useState(0);
   const [ticksPerSecond, setTicksPerSecondState] = useState(DEFAULT_TPS);
@@ -59,8 +64,10 @@ export function SimulationProvider({ children }: { children: React.ReactNode }) 
   useEffect(() => {
     void browserGet<RuntimeConfig>("/config")
       .then((data) => {
+        if (seenRevision.current !== 0) return;
         setPlaying(Boolean(data.playing));
         setFinished(Boolean(data.finished));
+        if (data.as_of !== undefined) setAsOf(data.as_of ?? null);
         if (data.ticks_per_second != null) {
           setTicksPerSecondState(clampRate(data.ticks_per_second));
         }
@@ -74,8 +81,11 @@ export function SimulationProvider({ children }: { children: React.ReactNode }) 
 
     function apply(data: MonitorSnapshot) {
       if (!on) return;
+      if (data.revision != null && data.revision < seenRevision.current) return;
+      if (data.revision != null) seenRevision.current = data.revision;
       if (data.playing != null) setPlaying(Boolean(data.playing));
       if (data.finished != null) setFinished(Boolean(data.finished));
+      if (data.as_of !== undefined) setAsOf(data.as_of);
       if (data.ticks_per_second != null) {
         setTicksPerSecondState(clampRate(data.ticks_per_second));
       }
@@ -120,12 +130,17 @@ export function SimulationProvider({ children }: { children: React.ReactNode }) 
 
   const applySnapshot = useCallback(
     (snap: {
+      revision?: number | null;
       playing?: boolean | null;
       ticks_per_second?: number | null;
       finished?: boolean | null;
+      as_of?: string | null;
     }) => {
+      if (snap.revision != null && snap.revision < seenRevision.current) return;
+      if (snap.revision != null) seenRevision.current = snap.revision;
       if (snap.playing != null) setPlaying(Boolean(snap.playing));
       if (snap.finished != null) setFinished(Boolean(snap.finished));
+      if (snap.as_of !== undefined) setAsOf(snap.as_of ?? null);
       if (snap.ticks_per_second != null) {
         setTicksPerSecondState(clampRate(snap.ticks_per_second));
       }
@@ -146,18 +161,20 @@ export function SimulationProvider({ children }: { children: React.ReactNode }) 
   }, [applySnapshot]);
 
   const togglePlay = useCallback(async () => {
-    if (!playing && finished) {
-      await resetSimulation();
+    if (playBusy.current) return;
+    playBusy.current = true;
+    try {
+      if (!playing && finished) {
+        await resetSimulation();
+      }
+      const snap = await browserPost<MonitorSnapshot>("/stream/control", {
+        playing: !playing,
+      });
+      applySnapshot(snap);
+    } finally {
+      playBusy.current = false;
     }
-    const snap = await browserPost<MonitorSnapshot>("/stream/control", {
-      playing: !playing,
-    });
-    setPlaying(Boolean(snap.playing));
-    setFinished(Boolean(snap.finished));
-    if (snap.ticks_per_second != null) {
-      setTicksPerSecondState(clampRate(snap.ticks_per_second));
-    }
-  }, [finished, playing, resetSimulation]);
+  }, [applySnapshot, finished, playing, resetSimulation]);
 
   const setTicksPerSecond = useCallback(async (rate: number) => {
     const next = clampRate(rate);
@@ -165,16 +182,13 @@ export function SimulationProvider({ children }: { children: React.ReactNode }) 
     const snap = await browserPost<MonitorSnapshot>("/stream/control", {
       ticks_per_second: next,
     });
-    if (snap.ticks_per_second != null) {
-      setTicksPerSecondState(clampRate(snap.ticks_per_second));
-    }
-    if (snap.playing != null) setPlaying(Boolean(snap.playing));
-    if (snap.finished != null) setFinished(Boolean(snap.finished));
-  }, []);
+    applySnapshot(snap);
+  }, [applySnapshot]);
 
   const value = useMemo<SimulationContextValue>(
     () => ({
       playing,
+      asOf,
       finished,
       resetting,
       resetRevision,
@@ -187,6 +201,7 @@ export function SimulationProvider({ children }: { children: React.ReactNode }) 
     }),
     [
       playing,
+      asOf,
       finished,
       resetting,
       resetRevision,
